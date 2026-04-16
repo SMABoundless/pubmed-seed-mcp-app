@@ -9,7 +9,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 
-const DIST_DIR = path.join(import.meta.dirname, "dist");
+// When compiled, server.js lives inside dist/ alongside mcp-app.html
+const DIST_DIR = import.meta.dirname.endsWith("dist")
+  ? import.meta.dirname
+  : path.join(import.meta.dirname, "dist");
 const EUTILS   = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
 const NCBI_QS  = "tool=pubmed-seed-mcp&email=pubmedseed%40example.com";
 const RESOURCE_URI = "ui://pubmed-seed/mcp-app.html";
