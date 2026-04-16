@@ -1,17 +1,29 @@
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import cors from "cors";
 import type { Request, Response } from "express";
 import { buildArticles, buildArticlesFromText, esearch, createServer } from "./server.js";
+
+// Manually set CORS headers — cors() middleware doesn't apply through createMcpExpressApp
+function setCors(res: Response): void {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
+}
 
 async function startStreamableHTTPServer(): Promise<void> {
   const port = parseInt(process.env.PORT ?? "3001", 10);
   const app  = createMcpExpressApp({ host: "0.0.0.0" });
-  app.use(cors());
 
-  // ── REST proxy — CORS-enabled, callable from Claude artifacts ────────────────
+  // ── Preflight for REST routes ─────────────────────────────────────────────────
+  app.options("/api/*path", (req: Request, res: Response) => {
+    setCors(res);
+    res.sendStatus(204);
+  });
+
+  // ── REST proxy — callable from Claude artifacts ───────────────────────────────
   app.get("/api/search", async (req: Request, res: Response) => {
+    setCors(res);
     const q    = String(req.query.q ?? "").trim();
     const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));
     if (!q) { res.status(400).json({ error: "q is required" }); return; }
@@ -28,6 +40,7 @@ async function startStreamableHTTPServer(): Promise<void> {
   });
 
   app.get("/api/lookup", async (req: Request, res: Response) => {
+    setCors(res);
     const ids  = String(req.query.ids ?? "").trim();
     const text = String(req.query.text ?? "").trim();
     if (!ids && !text) { res.status(400).json({ error: "ids or text is required" }); return; }
