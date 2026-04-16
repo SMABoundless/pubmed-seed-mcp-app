@@ -5,10 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && tsc -p tsconfig.server.json && cross-env INPUT=mcp-app.html vite build",
-    "start": "concurrently --raw \"cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch\" \"tsx watch main.ts\"",
-    "start:stdio": "tsx main.ts --stdio",
-    "preview": "node dist/main.js",
-    "serve": "tsx main.ts"
+    "start": "node dist/main.js",
+    "dev": "concurrently --raw \"cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch\" \"tsx watch main.ts\"",
+    "start:stdio": "node dist/main.js --stdio"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "latest",
