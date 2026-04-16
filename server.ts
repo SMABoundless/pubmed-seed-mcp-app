@@ -94,7 +94,7 @@ async function fetchFullXml(ids: string[]): Promise<Record<string, { mesh: strin
   return out;
 }
 
-async function buildArticles(ids: string[]): Promise<Article[]> {
+export async function buildArticles(ids: string[]): Promise<Article[]> {
   const [summaries, fullData] = await Promise.all([
     fetchSummaries(ids),
     fetchFullXml(ids),
@@ -106,7 +106,27 @@ async function buildArticles(ids: string[]): Promise<Article[]> {
   }));
 }
 
-async function esearch(term: string, retmax: number, retstart = 0): Promise<string[]> {
+export async function buildArticlesFromText(text: string): Promise<Article[]> {
+  const found = new Set<string>();
+  for (const m of text.matchAll(/(?:PMID|pmid)[:\s]*(\d{7,8})/g)) found.add(m[1]);
+  for (const m of text.matchAll(/^\s*(\d{7,8})\s*$/gm)) found.add(m[1]);
+  for (const m of text.matchAll(/10\.\d{4,}\/\S+/g)) {
+    const ids = await esearch(`${m[0]}[doi]`, 1);
+    if (ids[0]) found.add(ids[0]);
+  }
+  if (!found.size) {
+    const lines = text.split(/\n+/).filter(l => l.trim().length > 40);
+    for (const line of lines.slice(0, 10)) {
+      const t = line.replace(/^\d+\.\s*/, "").split(/[.;]\s+\d{4}/)[0].trim().slice(0, 120);
+      if (t.length < 15) continue;
+      const ids = await esearch(`${t}[Title]`, 1);
+      if (ids[0]) found.add(ids[0]);
+    }
+  }
+  return found.size ? buildArticles([...found]) : [];
+}
+
+export async function esearch(term: string, retmax: number, retstart = 0): Promise<string[]> {
   const qs  = `db=pubmed&term=${encodeURIComponent(term)}&retmax=${retmax}&retstart=${retstart}&retmode=json`;
   const res  = await eutils("esearch.fcgi", qs);
   const data = await res.json() as { esearchresult?: { idlist?: string[] } };
@@ -139,7 +159,17 @@ export function createServer(): McpServer {
       _meta: { ui: { resourceUri: RESOURCE_URI } },
     },
     async () => ({
-      content: [{ type: "text" as const, text: "PubMed Seed is open." }],
+      content: [{ type: "text" as const, text: [
+        "PubMed Seed is open.",
+        "",
+        "If the UI did not render inline, use these CORS-enabled REST endpoints to build an interactive artifact instead:",
+        "  GET https://pubmed-seed-mcp-app.onrender.com/api/search?q=QUERY&page=1",
+        "  GET https://pubmed-seed-mcp-app.onrender.com/api/lookup?ids=PMID1,PMID2",
+        "",
+        "Both return JSON: { articles: [{ pmid, doi, title, authors, moreAuth, year, journal, keywords, mesh }], has_more? }",
+        "",
+        "Build a React artifact with: search input → call /api/search → show article cards with MeSH chips → harvest terms → Boolean/PICO string builder.",
+      ].join("\n") }],
     }),
   );
 
